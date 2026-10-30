@@ -1,6 +1,6 @@
 require("dotenv").config();
 
-const patientRoutes = require("./routes/patientRoutes");
+const patientRoutes = require("./routes/PatientRoutes");
 const appointmentRoutes = require("./routes/appointmentRoutes");
 
 const express= require("express");

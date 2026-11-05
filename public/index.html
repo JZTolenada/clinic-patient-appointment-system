@@ -318,9 +318,24 @@
                 </div>
                 <div class="appt-modal-col appt-col-right">
                     <div class="modal-field">
-                        <label class="modal-label-bold">Appointment date and time</label>
-                        <input id="apptDateTime" type="datetime-local" class="appt-input">
-                        <small id="apptTimeHint" class="field-hint">Mon - Fri, 8:00 AM - 5:00 PM only</small>
+                        <label class="modal-label-bold">Appointment Date</label>
+                        <input id="apptDateInput" type="date" class="appt-input">
+                    </div>
+                    <div class="modal-field">
+                        <label class="modal-label-bold">Time Slot</label>
+                        <select id="apptTimeSlot" class="appt-input">
+                            <option value="">Select a time slot</option>
+                            <option value="08:00">8:00 AM</option>
+                            <option value="09:00">9:00 AM</option>
+                            <option value="10:00">10:00 AM</option>
+                            <option value="11:00">11:00 AM</option>
+                            <option value="13:00">1:00 PM</option>
+                            <option value="14:00">2:00 PM</option>
+                            <option value="15:00">3:00 PM</option>
+                            <option value="16:00">4:00 PM</option>
+                            <option value="17:00">5:00 PM</option>
+                        </select>
+                        <small id="apptTimeHint" class="field-hint">12:00 PM is lunch break (No appointments)</small>
                     </div>
                     <div class="appt-actions-right">
                         <button id="clearApptBtn" class="btn-clear-form">Clear Form</button>
@@ -375,11 +390,11 @@
         </div>
     </div>
 
-    <script src="js/auth.js"></script>
-    <script src="js/navigation.js"></script>
     <script src="js/dashboard.js"></script>
     <script src="js/patients.js"></script>
     <script src="js/appointments.js"></script>
+    <script src="js/navigation.js"></script>
+    <script src="js/auth.js"></script>
 </body>
 
 </html>

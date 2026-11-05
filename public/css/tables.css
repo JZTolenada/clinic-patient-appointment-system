@@ -287,3 +287,11 @@
 .btn-outline:active {
     transform: translateY(0);
 }
+
+.custom-table tr.past-appointment td {
+    background: #FEE2E2;
+}
+
+.custom-table tr.past-appointment:hover td {
+    background: #FECACA;
+}

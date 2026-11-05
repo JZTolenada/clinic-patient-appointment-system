@@ -32,7 +32,12 @@ function checkAuth() {
         loginView.classList.add("hidden")
         appView.classList.remove("hidden")
         appView.classList.add("flex")
-        showPage("dashboard")
+        if (typeof showPage === "function") {
+            showPage("dashboard")
+        }
+        if (typeof loadDashboard === "function") {
+            loadDashboard()
+        }
     } else {
         loginView.classList.remove("hidden")
         appView.classList.add("hidden")

@@ -87,13 +87,22 @@ function renderAppointmentsTable() {
         let isCancelled = appt.status === "Cancelled"
 
         let tr = document.createElement("tr")
+
+        let apptDateObj = new Date(appt.appointmentDate)
+        let todayObj = new Date()
+        apptDateObj.setHours(0, 0, 0, 0)
+        todayObj.setHours(0, 0, 0, 0)
+        if (apptDateObj < todayObj && (appt.status || "").toLowerCase() === "scheduled") {
+            tr.classList.add("past-appointment")
+        }
+
         tr.innerHTML =
             '<td>' + fullName + '</td>' +
             '<td><div>' + formatApptDate(appt.appointmentDate) + '</div><div class="appt-time">' + formatApptTime(appt.appointmentDate) + '</div></td>' +
             '<td>' + (appt.reason || "Consultation") + '</td>' +
             '<td>' +
                 '<select data-id="' + appt._id + '" data-patient="' + patientId + '" data-date="' + appt.appointmentDate + '" data-reason="' + (appt.reason || "Consultation") + '" data-prev-status="' + (appt.status || "Scheduled") + '" class="status-pill status-' + statusLower + ' status-select"' + (isCancelled ? " disabled" : "") + '>' +
-                    '<option value="Completed"' + (appt.status === "Completed" ? " selected" : "") + (canComplete && !isCancelled ? "" : " disabled") + '>Completed</option>' +
+                    '<option value="Completed"' + (appt.status === "Completed" ? " selected" : "") + ((canComplete || appt.status === "Completed") && !isCancelled ? "" : " disabled") + '>Completed</option>' +
                     '<option value="Scheduled"' + (appt.status === "Scheduled" ? " selected" : "") + (isCancelled ? " disabled" : "") + '>Scheduled</option>' +
                     '<option value="Cancelled"' + (appt.status === "Cancelled" ? " selected" : "") + '>Cancelled</option>' +
                 '</select>' +
@@ -149,6 +158,19 @@ function renderAppointmentsTable() {
                 sel.disabled = true
             }
 
+            let tr = sel.closest("tr")
+            if (tr) {
+                let d = new Date(apptDate)
+                let today = new Date()
+                d.setHours(0, 0, 0, 0)
+                today.setHours(0, 0, 0, 0)
+                if (d < today && newStatus === "Scheduled") {
+                    tr.classList.add("past-appointment")
+                } else {
+                    tr.classList.remove("past-appointment")
+                }
+            }
+
             for (let i = 0; i < allAppointments.length; i++) {
                 if (allAppointments[i]._id === id) {
                     allAppointments[i].status = newStatus
@@ -202,15 +224,115 @@ function loadAppointments() {
         })
 }
 
+function updateTimeSlots() {
+    let dateInput = document.getElementById("apptDateInput")
+    let timeSelect = document.getElementById("apptTimeSlot")
+    let hint = document.getElementById("apptTimeHint")
+    if (!dateInput || !timeSelect) return
+
+    let dateValue = dateInput.value
+    let allSlots = [
+        { value: "08:00", label: "8:00 AM" },
+        { value: "09:00", label: "9:00 AM" },
+        { value: "10:00", label: "10:00 AM" },
+        { value: "11:00", label: "11:00 AM" },
+        { value: "13:00", label: "1:00 PM" },
+        { value: "14:00", label: "2:00 PM" },
+        { value: "15:00", label: "3:00 PM" },
+        { value: "16:00", label: "4:00 PM" },
+        { value: "17:00", label: "5:00 PM" }
+    ]
+
+    if (!dateValue) {
+        timeSelect.innerHTML = '<option value="">Select a time slot</option>'
+        allSlots.forEach(function (slot) {
+            timeSelect.innerHTML += '<option value="' + slot.value + '">' + slot.label + '</option>'
+        })
+        timeSelect.disabled = false
+        saveApptBtn.disabled = false
+        saveApptBtn.classList.remove("btn-disabled")
+        if (hint) {
+            hint.textContent = "12:00 PM is lunch break (No appointments)"
+            hint.style.color = "#888888"
+        }
+        return
+    }
+
+    let parts = dateValue.split("-")
+    let chosenDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
+    let dayOfWeek = chosenDate.getDay()
+
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+        timeSelect.innerHTML = '<option value="">Not available on weekends</option>'
+        timeSelect.disabled = true
+        saveApptBtn.disabled = true
+        saveApptBtn.classList.add("btn-disabled")
+        if (hint) {
+            hint.textContent = "Appointments are only available Monday to Friday."
+            hint.style.color = "#DC2626"
+        }
+        return
+    }
+
+    timeSelect.disabled = false
+    saveApptBtn.disabled = false
+    saveApptBtn.classList.remove("btn-disabled")
+
+    let bookedHours = []
+    allAppointments.forEach(function (appt) {
+        if (appt.status === "Cancelled") return
+        let d = new Date(appt.appointmentDate)
+        let apptY = d.getFullYear()
+        let apptM = String(d.getMonth() + 1).padStart(2, "0")
+        let apptDay = String(d.getDate()).padStart(2, "0")
+        let apptDateStr = apptY + "-" + apptM + "-" + apptDay
+
+        if (apptDateStr === dateValue) {
+            let h = String(d.getHours()).padStart(2, "0")
+            bookedHours.push(h + ":00")
+        }
+    })
+
+    timeSelect.innerHTML = '<option value="">Select a time slot</option>'
+    let availableCount = 0
+
+    allSlots.forEach(function (slot) {
+        let isBooked = bookedHours.indexOf(slot.value) !== -1
+        if (isBooked) {
+            timeSelect.innerHTML += '<option value="' + slot.value + '" disabled>' + slot.label + ' (Booked)</option>'
+        } else {
+            timeSelect.innerHTML += '<option value="' + slot.value + '">' + slot.label + '</option>'
+            availableCount++
+        }
+    })
+
+    if (hint) {
+        if (availableCount === 0) {
+            hint.textContent = "All time slots are fully booked for this date."
+            hint.style.color = "#DC2626"
+            saveApptBtn.disabled = true
+            saveApptBtn.classList.add("btn-disabled")
+        } else {
+            hint.textContent = availableCount + " slot(s) available. 12:00 PM is lunch break."
+            hint.style.color = "#888888"
+            saveApptBtn.disabled = false
+            saveApptBtn.classList.remove("btn-disabled")
+        }
+    }
+}
+
 addApptBtn.addEventListener("click", function () {
-    document.getElementById("apptDateTime").value = ""
+    let dateInput = document.getElementById("apptDateInput")
+    let timeSelect = document.getElementById("apptTimeSlot")
+    if (dateInput) dateInput.value = ""
+    if (timeSelect) timeSelect.value = ""
     document.getElementById("apptReason").value = ""
     saveApptBtn.disabled = false
     saveApptBtn.classList.remove("btn-disabled")
 
     let hint = document.getElementById("apptTimeHint")
     if (hint) {
-        hint.textContent = "Mon - Fri, 8:00 AM - 5:00 PM only"
+        hint.textContent = "12:00 PM is lunch break (No appointments)"
         hint.style.color = "#888888"
     }
 
@@ -218,7 +340,7 @@ addApptBtn.addEventListener("click", function () {
     let year = now.getFullYear()
     let month = String(now.getMonth() + 1).padStart(2, "0")
     let day = String(now.getDate()).padStart(2, "0")
-    document.getElementById("apptDateTime").min = year + "-" + month + "-" + day + "T08:00"
+    if (dateInput) dateInput.min = year + "-" + month + "-" + day
 
     let select = document.getElementById("apptPatientSelect")
     select.innerHTML = '<option value="">Select patient</option>'
@@ -237,6 +359,15 @@ addApptBtn.addEventListener("click", function () {
             })
         })
 
+    fetch("/appointments")
+        .then(function (response) {
+            return response.json()
+        })
+        .then(function (appointments) {
+            allAppointments = appointments
+            updateTimeSlots()
+        })
+
     apptModal.classList.remove("hidden")
 })
 
@@ -248,128 +379,69 @@ apptModal.addEventListener("click", function (e) {
 
 clearApptBtn.addEventListener("click", function () {
     document.getElementById("apptPatientSelect").value = ""
-    document.getElementById("apptDateTime").value = ""
+    let dateInput = document.getElementById("apptDateInput")
+    let timeSelect = document.getElementById("apptTimeSlot")
+    if (dateInput) dateInput.value = ""
+    if (timeSelect) timeSelect.value = ""
     document.getElementById("apptReason").value = ""
     saveApptBtn.disabled = false
     saveApptBtn.classList.remove("btn-disabled")
     let hint = document.getElementById("apptTimeHint")
     if (hint) {
-        hint.textContent = "Mon - Fri, 8:00 AM - 5:00 PM only"
+        hint.textContent = "12:00 PM is lunch break (No appointments)"
         hint.style.color = "#888888"
     }
+    updateTimeSlots()
 })
 
-document.getElementById("apptDateTime").addEventListener("input", function () {
-    let val = this.value
-    let hint = document.getElementById("apptTimeHint")
-
-    if (!val) {
-        saveApptBtn.disabled = false
-        saveApptBtn.classList.remove("btn-disabled")
-        if (hint) {
-            hint.textContent = "Mon - Fri, 8:00 AM - 5:00 PM only"
-            hint.style.color = "#888888"
-        }
-        return
-    }
-
-    let d = new Date(val)
-    let dayOfWeek = d.getDay()
-    let hours = d.getHours()
-    let minutes = d.getMinutes()
-
-    let isWeekend = (dayOfWeek === 0 || dayOfWeek === 6)
-    let isOutsideHours = (hours < 8 || hours > 17 || (hours === 17 && minutes > 0))
-
-    if (isWeekend || isOutsideHours) {
-        saveApptBtn.disabled = true
-        saveApptBtn.classList.add("btn-disabled")
-        if (hint) {
-            hint.textContent = "Appointments are only available between 8:00 AM and 5:00 PM (Mon - Fri)"
-            hint.style.color = "#DC2626"
-        }
-    } else {
-        saveApptBtn.disabled = false
-        saveApptBtn.classList.remove("btn-disabled")
-        if (hint) {
-            hint.textContent = "Mon - Fri, 8:00 AM - 5:00 PM only"
-            hint.style.color = "#888888"
-        }
-    }
-})
-
-document.getElementById("apptDateTime").addEventListener("change", function () {
-    let val = this.value
-    let hint = document.getElementById("apptTimeHint")
-
-    if (!val) return
-
-    let d = new Date(val)
-    let dayOfWeek = d.getDay()
-    let hours = d.getHours()
-    let minutes = d.getMinutes()
-
-    let isWeekend = (dayOfWeek === 0 || dayOfWeek === 6)
-    let isOutsideHours = (hours < 8 || hours > 17 || (hours === 17 && minutes > 0))
-
-    if (isWeekend || isOutsideHours) {
-        saveApptBtn.disabled = true
-        saveApptBtn.classList.add("btn-disabled")
-        if (hint) {
-            hint.textContent = "Appointments are only available between 8:00 AM and 5:00 PM (Mon - Fri)"
-            hint.style.color = "#DC2626"
-        }
-    } else {
-        saveApptBtn.disabled = false
-        saveApptBtn.classList.remove("btn-disabled")
-        if (hint) {
-            hint.textContent = "Mon - Fri, 8:00 AM - 5:00 PM only"
-            hint.style.color = "#888888"
-        }
-    }
-})
+let dateInputEl = document.getElementById("apptDateInput")
+if (dateInputEl) {
+    dateInputEl.addEventListener("change", function () {
+        updateTimeSlots()
+    })
+    dateInputEl.addEventListener("input", function () {
+        updateTimeSlots()
+    })
+}
 
 saveApptBtn.addEventListener("click", function () {
     if (saveApptBtn.disabled) return
 
     let patientId = document.getElementById("apptPatientSelect").value
-    let dateTime = document.getElementById("apptDateTime").value
+    let dateInput = document.getElementById("apptDateInput")
+    let timeSelect = document.getElementById("apptTimeSlot")
+    let dateValue = dateInput ? dateInput.value : ""
+    let timeValue = timeSelect ? timeSelect.value : ""
     let reason = document.getElementById("apptReason").value.trim() || "Consultation"
 
-    if (!patientId || !dateTime) {
-        showAlert("Please select a patient and appointment date/time.")
+    if (!patientId || !dateValue || !timeValue) {
+        showAlert("Please select a patient, appointment date, and time slot.")
         return
     }
 
-    let selectedDate = new Date(dateTime)
-    let day = selectedDate.getDay()
-    let hours = selectedDate.getHours()
-    let minutes = selectedDate.getMinutes()
-
-    if (day === 0 || day === 6 || hours < 8 || hours > 17 || (hours === 17 && minutes > 0)) {
-        saveApptBtn.disabled = true
-        saveApptBtn.classList.add("btn-disabled")
-        let hint = document.getElementById("apptTimeHint")
-        if (hint) {
-            hint.textContent = "Appointments are only available between 8:00 AM and 5:00 PM (Mon - Fri)"
-            hint.style.color = "#DC2626"
-        }
-        return
-    }
+    let parts = dateValue.split("-")
+    let timeParts = timeValue.split(":")
+    let appointmentDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), parseInt(timeParts[0]), parseInt(timeParts[1]), 0)
 
     fetch("/appointments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             patientId: patientId,
-            appointmentDate: new Date(dateTime).toISOString(),
+            appointmentDate: appointmentDate.toISOString(),
             reason: reason
         })
     })
         .then(function (response) {
-            return response.json()
+            return response.json().then(function (data) {
+                return { ok: response.ok, data: data }
+            })
         })
-        .then(function (data) {
+        .then(function (result) {
+            if (!result.ok) {
+                showAlert(result.data.message || "Failed to book appointment.")
+                return
+            }
             apptModal.classList.add("hidden")
             apptSuccessModal.classList.remove("hidden")
             loadAppointments()
@@ -377,6 +449,9 @@ saveApptBtn.addEventListener("click", function () {
             setTimeout(function () {
                 apptSuccessModal.classList.add("hidden")
             }, 2000)
+        })
+        .catch(function () {
+            showAlert("An error occurred while creating the appointment.")
         })
 })
 

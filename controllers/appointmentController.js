@@ -13,6 +13,43 @@ const createAppointment= async (req, res) => {
             });
         }
 
+        const apptDate= new Date(appointmentDate);
+        const apptHour= apptDate.getHours();
+        const VALID_HOURS= [8, 9, 10, 11, 13, 14, 15, 16, 17];
+
+        if(VALID_HOURS.indexOf(apptHour) === -1){
+            return res.status(400).json({
+                message: "Appointments are only available from 8:00 AM - 11:00 AM and 1:00 PM - 5:00 PM. 12:00 PM is lunch break."
+            });
+        }
+
+        if(apptDate.getMinutes() !== 0){
+            return res.status(400).json({
+                message: "Appointments must be scheduled on the hour (e.g. 8:00 AM, 9:00 AM)."
+            });
+        }
+
+        const dayOfWeek= apptDate.getDay();
+        if(dayOfWeek === 0 || dayOfWeek === 6){
+            return res.status(400).json({
+                message: "Appointments are only available Monday to Friday."
+            });
+        }
+
+        const startOfSlot= new Date(apptDate.getTime() - 50 * 60 * 1000);
+        const endOfSlot= new Date(apptDate.getTime() + 50 * 60 * 1000);
+
+        const conflict= await Appointment.findOne({
+            appointmentDate: { $gte: startOfSlot, $lte: endOfSlot },
+            status: { $ne: "Cancelled" }
+        });
+
+        if(conflict){
+            return res.status(400).json({
+                message: "This time slot is already booked. Please choose another time slot."
+            });
+        }
+
         const appointment= new Appointment({
             patientId: patientId,
             appointmentDate: appointmentDate,
@@ -83,6 +120,20 @@ const updateAppointment= async (req, res) => {
             });
         }
 
+        if(appointmentDate && status !== "Cancelled"){
+            const reqDate = new Date(appointmentDate);
+            const conflict = await Appointment.findOne({
+                _id: { $ne: req.params.id },
+                appointmentDate: { $gte: new Date(reqDate.getTime() - 50 * 60 * 1000), $lte: new Date(reqDate.getTime() + 50 * 60 * 1000) },
+                status: { $ne: "Cancelled" }
+            });
+            if(conflict){
+                return res.status(400).json({
+                    message: "This time slot is already booked."
+                });
+            }
+        }
+
         const appointment= await Appointment.findByIdAndUpdate(req.params.id,
             {
                 patientId: patientId,
@@ -134,6 +185,5 @@ const deleteAppointment= async (req, res) => {
         });
     }
 };
-
 
 module.exports= { createAppointment, getAppointments, getAppointmentById, updateAppointment, deleteAppointment };

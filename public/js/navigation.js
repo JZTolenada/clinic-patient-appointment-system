@@ -44,7 +44,9 @@ function showPage(pageName) {
         if (searchBarWrapper) {
             searchBarWrapper.classList.add("hidden")
         }
-        loadDashboard()
+        if (typeof loadDashboard === "function") {
+            loadDashboard()
+        }
     }
 
     if (pageName === "patients") {
@@ -55,7 +57,9 @@ function showPage(pageName) {
             searchInput.value = ""
             searchInput.placeholder = "Search patients"
         }
-        loadPatients()
+        if (typeof loadPatients === "function") {
+            loadPatients()
+        }
     }
 
     if (pageName === "appointments") {
@@ -66,7 +70,9 @@ function showPage(pageName) {
             searchInput.value = ""
             searchInput.placeholder = "Search appointments"
         }
-        loadAppointments()
+        if (typeof loadAppointments === "function") {
+            loadAppointments()
+        }
     }
 
     let dateStr = getFormattedDate()

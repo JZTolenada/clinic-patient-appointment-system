@@ -1,4 +1,5 @@
 const Patient = require("../models/Patient");
+const Appointment = require("../models/Appointment");
 
 const createPatient = async (req, res) => {
     try {
@@ -102,6 +103,8 @@ const deletePatient= async (req, res) => {
                 message: "Patient not found."
             })
         }
+
+        await Appointment.deleteMany({ patientId: req.params.id });
 
         return res.status(200).json({
             message: "Patient deleted successfully."

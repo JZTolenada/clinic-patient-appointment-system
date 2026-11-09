@@ -44,6 +44,8 @@
 - **Multi-Directional Column Sorting**: Sorting state toggles (`▲`, `▼`, `⇅`) for appointments based on parsed dates and statuses.
 - **Constrained Viewport Architecture**: Custom `.table-card` CSS constraint (`calc(100vh - 270px)`) with sticky `<th>` elements to ensure only the table scrolls vertically while the page layout remains stationary.
 - **100% Self-Contained Vanilla Delivery**: Eliminated all external CDN dependencies and CSS frameworks (e.g., Tailwind browser compiler); bundled local Poppins font families, customized SVG iconography, and created an authentic transparent logo and native multi-format favicon (`.ico` + `.png`).
+- **Patient Auto-Suggest Search Bar**: Replaced static patient selection dropdown with a real-time auto-suggest search bar supporting live matching across patient names and phone numbers, keyboard navigation, and selection confirmation badges.
+- **Timezone-Resilient Appointment Scheduling**: Engineered scheduling logic to preserve clinic timezone (`Asia/Manila`, UTC+8) across backend validation checks and frontend rendering, eliminating host server timezone mismatch issues.
 
 ---
 

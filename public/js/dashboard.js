@@ -5,10 +5,12 @@ function loadDashboard() {
         })
         .then(function (appointments) {
             let today = new Date()
-            let todayYear = today.getFullYear()
-            let todayMonth = String(today.getMonth() + 1).padStart(2, "0")
-            let todayDate = String(today.getDate()).padStart(2, "0")
-            let todayStr = todayYear + "-" + todayMonth + "-" + todayDate
+            let todayStr = new Intl.DateTimeFormat("en-CA", {
+                timeZone: "Asia/Manila",
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit"
+            }).format(today)
 
             let todayCount = 0
             let scheduledCount = 0
@@ -17,10 +19,12 @@ function loadDashboard() {
 
             appointments.forEach(function (appt) {
                 let d = new Date(appt.appointmentDate)
-                let y = d.getFullYear()
-                let m = String(d.getMonth() + 1).padStart(2, "0")
-                let day = String(d.getDate()).padStart(2, "0")
-                let apptDateStr = y + "-" + m + "-" + day
+                let apptDateStr = new Intl.DateTimeFormat("en-CA", {
+                    timeZone: "Asia/Manila",
+                    year: "numeric",
+                    month: "2-digit",
+                    day: "2-digit"
+                }).format(d)
 
                 if (apptDateStr === todayStr) {
                     todayCount++

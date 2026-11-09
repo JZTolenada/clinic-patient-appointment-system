@@ -107,8 +107,15 @@ if (searchInput) {
         if (appointmentsPage && !appointmentsPage.classList.contains("hidden")) {
             let rows = document.querySelectorAll("#apptTableBody tr")
             rows.forEach(function (row) {
-                let text = row.textContent.toLowerCase()
-                row.style.display = text.includes(query) ? "" : "none"
+                let cells = row.querySelectorAll("td")
+                if (cells.length < 4) return
+                let patientText = cells[0].textContent.toLowerCase()
+                let dateText = cells[1].textContent.toLowerCase()
+                let reasonText = cells[2].textContent.toLowerCase()
+                let statusSelect = cells[3].querySelector("select")
+                let statusText = statusSelect ? statusSelect.value.toLowerCase() : ""
+                let rowSearchable = patientText + " " + dateText + " " + reasonText + " " + statusText
+                row.style.display = rowSearchable.includes(query) ? "" : "none"
             })
         }
     })

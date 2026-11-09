@@ -4,25 +4,50 @@ let addApptBtn = document.getElementById("addApptBtn")
 let saveApptBtn = document.getElementById("saveApptBtn")
 let clearApptBtn = document.getElementById("clearApptBtn")
 
+let patientSearchInput = document.getElementById("apptPatientSearch")
+let patientIdInput = document.getElementById("apptPatientId")
+let clearPatientSearchBtn = document.getElementById("clearPatientSearchBtn")
+let patientSuggestionsList = document.getElementById("patientSuggestionsList")
+
 let allAppointments = []
+let availablePatients = []
 let currentSortCol = null
 let currentSortDir = "asc"
+let activeSuggestionIndex = -1
 
 function formatApptDate(dateStr) {
-    let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
     let d = new Date(dateStr)
-    return months[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear()
+    return new Intl.DateTimeFormat("en-US", {
+        timeZone: "Asia/Manila",
+        month: "short",
+        day: "numeric",
+        year: "numeric"
+    }).format(d)
 }
 
 function formatApptTime(dateStr) {
     let d = new Date(dateStr)
-    let hours = d.getHours()
-    let minutes = d.getMinutes()
-    let ampm = hours >= 12 ? "PM" : "AM"
-    hours = hours % 12
-    if (hours === 0) hours = 12
-    let minStr = minutes < 10 ? "0" + minutes : minutes
-    return hours + ":" + minStr + " " + ampm
+    return new Intl.DateTimeFormat("en-US", {
+        timeZone: "Asia/Manila",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true
+    }).format(d)
+}
+
+function getManilaDateString(dateObj) {
+    return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Manila",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+    }).format(dateObj)
+}
+
+function formatPatientName(p) {
+    if (!p) return ""
+    let mid = p.middleName ? " " + p.middleName + " " : " "
+    return (p.firstName + mid + p.lastName).replace(/\s+/g, " ").trim()
 }
 
 function sortAppointments(list) {
@@ -72,12 +97,11 @@ function renderAppointmentsTable() {
 
     sorted.forEach(function (appt) {
         let patient = appt.patientId
-        let fullName = ""
+        let fullName = "Unknown Patient"
         let patientId = ""
         if (patient) {
-            let mid = patient.middleName ? " " + patient.middleName + " " : " "
-            fullName = patient.firstName + mid + patient.lastName
-            patientId = patient._id
+            fullName = formatPatientName(patient)
+            patientId = patient._id || ""
         }
 
         let statusLower = (appt.status || "Scheduled").toLowerCase()
@@ -89,10 +113,10 @@ function renderAppointmentsTable() {
         let tr = document.createElement("tr")
 
         let apptDateObj = new Date(appt.appointmentDate)
-        let todayObj = new Date()
-        apptDateObj.setHours(0, 0, 0, 0)
-        todayObj.setHours(0, 0, 0, 0)
-        if (apptDateObj < todayObj && (appt.status || "").toLowerCase() === "scheduled") {
+        let apptDateStr = getManilaDateString(apptDateObj)
+        let todayStr = getManilaDateString(new Date())
+
+        if (apptDateStr < todayStr && (appt.status || "").toLowerCase() === "scheduled") {
             tr.classList.add("past-appointment")
         }
 
@@ -161,10 +185,9 @@ function renderAppointmentsTable() {
             let tr = sel.closest("tr")
             if (tr) {
                 let d = new Date(apptDate)
-                let today = new Date()
-                d.setHours(0, 0, 0, 0)
-                today.setHours(0, 0, 0, 0)
-                if (d < today && newStatus === "Scheduled") {
+                let aDateStr = getManilaDateString(d)
+                let tDateStr = getManilaDateString(new Date())
+                if (aDateStr < tDateStr && newStatus === "Scheduled") {
                     tr.classList.add("past-appointment")
                 } else {
                     tr.classList.remove("past-appointment")
@@ -182,17 +205,32 @@ function renderAppointmentsTable() {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    patientId: patientId,
+                    patientId: patientId || undefined,
                     appointmentDate: apptDate,
                     reason: reason,
                     status: newStatus
                 })
             })
                 .then(function (response) {
-                    return response.json()
+                    return response.json().then(function (data) {
+                        return { ok: response.ok, data: data }
+                    })
                 })
-                .then(function (data) {
+                .then(function (result) {
+                    if (!result.ok) {
+                        if (typeof showAlert === "function") {
+                            showAlert(result.data.message || "Failed to update appointment status.")
+                        }
+                        loadAppointments()
+                        return
+                    }
                     if (typeof loadDashboard === "function") loadDashboard()
+                })
+                .catch(function () {
+                    if (typeof showAlert === "function") {
+                        showAlert("An error occurred while updating the status.")
+                    }
+                    loadAppointments()
                 })
         })
     })
@@ -219,7 +257,11 @@ function loadAppointments() {
             return response.json()
         })
         .then(function (appointments) {
-            allAppointments = appointments
+            allAppointments = appointments || []
+            renderAppointmentsTable()
+        })
+        .catch(function () {
+            allAppointments = []
             renderAppointmentsTable()
         })
 }
@@ -259,7 +301,7 @@ function updateTimeSlots() {
     }
 
     let parts = dateValue.split("-")
-    let chosenDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
+    let chosenDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10))
     let dayOfWeek = chosenDate.getDay()
 
     if (dayOfWeek === 0 || dayOfWeek === 6) {
@@ -282,14 +324,15 @@ function updateTimeSlots() {
     allAppointments.forEach(function (appt) {
         if (appt.status === "Cancelled") return
         let d = new Date(appt.appointmentDate)
-        let apptY = d.getFullYear()
-        let apptM = String(d.getMonth() + 1).padStart(2, "0")
-        let apptDay = String(d.getDate()).padStart(2, "0")
-        let apptDateStr = apptY + "-" + apptM + "-" + apptDay
+        let apptDateStr = getManilaDateString(d)
 
         if (apptDateStr === dateValue) {
-            let h = String(d.getHours()).padStart(2, "0")
-            bookedHours.push(h + ":00")
+            let hourStr = new Intl.DateTimeFormat("en-GB", {
+                timeZone: "Asia/Manila",
+                hour: "2-digit",
+                hourCycle: "h23"
+            }).format(d)
+            bookedHours.push(hourStr + ":00")
         }
     })
 
@@ -321,6 +364,154 @@ function updateTimeSlots() {
     }
 }
 
+// -------------------------------------------------------------
+// Patient Auto-Suggest Search Logic
+// -------------------------------------------------------------
+
+function renderPatientSuggestions(query) {
+    if (!patientSuggestionsList) return
+    patientSuggestionsList.innerHTML = ""
+    activeSuggestionIndex = -1
+
+    let q = (query || "").trim().toLowerCase()
+    let filtered = availablePatients.filter(function (p) {
+        if (!q) return true
+        let fullName = formatPatientName(p).toLowerCase()
+        let phone = (p.phone || "").toLowerCase()
+        return fullName.includes(q) || phone.includes(q)
+    })
+
+    if (filtered.length === 0) {
+        patientSuggestionsList.innerHTML = '<div class="suggestion-empty">No patients found. Please add the patient in Patients menu first.</div>'
+        patientSuggestionsList.classList.remove("hidden")
+        return
+    }
+
+    filtered.forEach(function (p) {
+        let item = document.createElement("div")
+        item.className = "suggestion-item"
+        let name = formatPatientName(p)
+        let meta = "Contact: " + (p.phone || "N/A") + (p.age ? " | Age: " + p.age : "") + (p.sex ? " | Gender: " + p.sex : "")
+
+        item.innerHTML =
+            '<div class="suggestion-name">' + name + '</div>' +
+            '<div class="suggestion-meta">' + meta + '</div>'
+
+        item.addEventListener("mousedown", function (e) {
+            e.preventDefault()
+            selectPatient(p)
+        })
+
+        patientSuggestionsList.appendChild(item)
+    })
+
+    patientSuggestionsList.classList.remove("hidden")
+}
+
+function selectPatient(p) {
+    if (!p) return
+    let name = formatPatientName(p)
+    if (patientSearchInput) patientSearchInput.value = name
+    if (patientIdInput) patientIdInput.value = p._id
+
+    if (clearPatientSearchBtn) {
+        clearPatientSearchBtn.classList.remove("hidden")
+    }
+
+    if (patientSuggestionsList) {
+        patientSuggestionsList.classList.add("hidden")
+    }
+}
+
+function resetPatientSelection() {
+    if (patientSearchInput) patientSearchInput.value = ""
+    if (patientIdInput) patientIdInput.value = ""
+    if (clearPatientSearchBtn) clearPatientSearchBtn.classList.add("hidden")
+    if (patientSuggestionsList) {
+        patientSuggestionsList.classList.add("hidden")
+        patientSuggestionsList.innerHTML = ""
+    }
+    activeSuggestionIndex = -1
+}
+
+function updateActiveSuggestion(items) {
+    items.forEach(function (it, idx) {
+        if (idx === activeSuggestionIndex) {
+            it.classList.add("active-suggestion")
+            it.scrollIntoView({ block: "nearest" })
+        } else {
+            it.classList.remove("active-suggestion")
+        }
+    })
+}
+
+if (patientSearchInput) {
+    patientSearchInput.addEventListener("input", function () {
+        let val = patientSearchInput.value
+        if (patientIdInput) patientIdInput.value = ""
+
+        if (val.trim().length > 0) {
+            if (clearPatientSearchBtn) clearPatientSearchBtn.classList.remove("hidden")
+        } else {
+            if (clearPatientSearchBtn) clearPatientSearchBtn.classList.add("hidden")
+        }
+
+        renderPatientSuggestions(val)
+    })
+
+    patientSearchInput.addEventListener("focus", function () {
+        renderPatientSuggestions(patientSearchInput.value)
+    })
+
+    patientSearchInput.addEventListener("blur", function () {
+        setTimeout(function () {
+            if (patientSuggestionsList) {
+                patientSuggestionsList.classList.add("hidden")
+            }
+        }, 200)
+    })
+
+    patientSearchInput.addEventListener("keydown", function (e) {
+        let items = patientSuggestionsList ? patientSuggestionsList.querySelectorAll(".suggestion-item") : []
+        if (!items || items.length === 0) return
+
+        if (e.key === "ArrowDown") {
+            e.preventDefault()
+            activeSuggestionIndex++
+            if (activeSuggestionIndex >= items.length) activeSuggestionIndex = 0
+            updateActiveSuggestion(items)
+        } else if (e.key === "ArrowUp") {
+            e.preventDefault()
+            activeSuggestionIndex--
+            if (activeSuggestionIndex < 0) activeSuggestionIndex = items.length - 1
+            updateActiveSuggestion(items)
+        } else if (e.key === "Enter") {
+            e.preventDefault()
+            if (activeSuggestionIndex >= 0 && activeSuggestionIndex < items.length) {
+                items[activeSuggestionIndex].dispatchEvent(new MouseEvent("mousedown"))
+            } else if (items.length === 1) {
+                items[0].dispatchEvent(new MouseEvent("mousedown"))
+            }
+        } else if (e.key === "Escape") {
+            patientSuggestionsList.classList.add("hidden")
+        }
+    })
+}
+
+if (clearPatientSearchBtn) {
+    clearPatientSearchBtn.addEventListener("click", function () {
+        resetPatientSelection()
+        if (patientSearchInput) {
+            patientSearchInput.focus()
+            renderPatientSuggestions("")
+        }
+    })
+}
+
+// -------------------------------------------------------------
+// Modal Triggers and Save Appointment
+// -------------------------------------------------------------
+
 addApptBtn.addEventListener("click", function () {
     let dateInput = document.getElementById("apptDateInput")
     let timeSelect = document.getElementById("apptTimeSlot")
@@ -330,6 +521,8 @@ addApptBtn.addEventListener("click", function () {
     saveApptBtn.disabled = false
     saveApptBtn.classList.remove("btn-disabled")
 
+    resetPatientSelection()
+
     let hint = document.getElementById("apptTimeHint")
     if (hint) {
         hint.textContent = "12:00 PM is lunch break (No appointments)"
@@ -337,26 +530,18 @@ addApptBtn.addEventListener("click", function () {
     }
 
     let now = new Date()
-    let year = now.getFullYear()
-    let month = String(now.getMonth() + 1).padStart(2, "0")
-    let day = String(now.getDate()).padStart(2, "0")
-    if (dateInput) dateInput.min = year + "-" + month + "-" + day
-
-    let select = document.getElementById("apptPatientSelect")
-    select.innerHTML = '<option value="">Select patient</option>'
+    let todayStr = getManilaDateString(now)
+    if (dateInput) dateInput.min = todayStr
 
     fetch("/patients")
         .then(function (response) {
             return response.json()
         })
         .then(function (patients) {
-            patients.forEach(function (p) {
-                let option = document.createElement("option")
-                option.value = p._id
-                let mid = p.middleName ? " " + p.middleName + " " : " "
-                option.textContent = p.firstName + mid + p.lastName
-                select.appendChild(option)
-            })
+            availablePatients = Array.isArray(patients) ? patients : []
+        })
+        .catch(function () {
+            availablePatients = []
         })
 
     fetch("/appointments")
@@ -364,21 +549,29 @@ addApptBtn.addEventListener("click", function () {
             return response.json()
         })
         .then(function (appointments) {
-            allAppointments = appointments
+            allAppointments = Array.isArray(appointments) ? appointments : []
+            updateTimeSlots()
+        })
+        .catch(function () {
+            allAppointments = []
             updateTimeSlots()
         })
 
     apptModal.classList.remove("hidden")
+    setTimeout(function () {
+        if (patientSearchInput) patientSearchInput.focus()
+    }, 100)
 })
 
 apptModal.addEventListener("click", function (e) {
     if (e.target === apptModal) {
         apptModal.classList.add("hidden")
+        resetPatientSelection()
     }
 })
 
 clearApptBtn.addEventListener("click", function () {
-    document.getElementById("apptPatientSelect").value = ""
+    resetPatientSelection()
     let dateInput = document.getElementById("apptDateInput")
     let timeSelect = document.getElementById("apptTimeSlot")
     if (dateInput) dateInput.value = ""
@@ -407,28 +600,37 @@ if (dateInputEl) {
 saveApptBtn.addEventListener("click", function () {
     if (saveApptBtn.disabled) return
 
-    let patientId = document.getElementById("apptPatientSelect").value
+    let patientId = patientIdInput ? patientIdInput.value.trim() : ""
+    let patientSearchVal = patientSearchInput ? patientSearchInput.value.trim() : ""
     let dateInput = document.getElementById("apptDateInput")
     let timeSelect = document.getElementById("apptTimeSlot")
     let dateValue = dateInput ? dateInput.value : ""
     let timeValue = timeSelect ? timeSelect.value : ""
     let reason = document.getElementById("apptReason").value.trim() || "Consultation"
 
-    if (!patientId || !dateValue || !timeValue) {
-        showAlert("Please select a patient, appointment date, and time slot.")
+    if (!patientId) {
+        if (!patientSearchVal) {
+            if (typeof showAlert === "function") showAlert("Please search and select a patient.")
+        } else {
+            if (typeof showAlert === "function") showAlert("Please select a patient from the auto-suggest list.")
+        }
         return
     }
 
-    let parts = dateValue.split("-")
-    let timeParts = timeValue.split(":")
-    let appointmentDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), parseInt(timeParts[0]), parseInt(timeParts[1]), 0)
+    if (!dateValue || !timeValue) {
+        if (typeof showAlert === "function") showAlert("Please select an appointment date and time slot.")
+        return
+    }
+
+    // Explicitly send date with +08:00 clinic timezone offset
+    let appointmentDateIso = dateValue + "T" + timeValue + ":00.000+08:00"
 
     fetch("/appointments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             patientId: patientId,
-            appointmentDate: appointmentDate.toISOString(),
+            appointmentDate: appointmentDateIso,
             reason: reason
         })
     })
@@ -439,10 +641,13 @@ saveApptBtn.addEventListener("click", function () {
         })
         .then(function (result) {
             if (!result.ok) {
-                showAlert(result.data.message || "Failed to book appointment.")
+                if (typeof showAlert === "function") {
+                    showAlert(result.data.message || "Failed to book appointment.")
+                }
                 return
             }
             apptModal.classList.add("hidden")
+            resetPatientSelection()
             apptSuccessModal.classList.remove("hidden")
             loadAppointments()
             if (typeof loadDashboard === "function") loadDashboard()
@@ -451,7 +656,9 @@ saveApptBtn.addEventListener("click", function () {
             }, 2000)
         })
         .catch(function () {
-            showAlert("An error occurred while creating the appointment.")
+            if (typeof showAlert === "function") {
+                showAlert("An error occurred while creating the appointment.")
+            }
         })
 })
 

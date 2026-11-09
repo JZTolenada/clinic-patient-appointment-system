@@ -14,7 +14,21 @@ const createAppointment= async (req, res) => {
         }
 
         const apptDate= new Date(appointmentDate);
-        const apptHour= apptDate.getHours();
+        if(isNaN(apptDate.getTime())){
+            return res.status(400).json({
+                message: "Invalid appointment date."
+            });
+        }
+
+        // Clinic operates on Asia/Manila (UTC+8)
+        const hourStr = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Manila", hour: "2-digit", hourCycle: "h23" }).format(apptDate);
+        const minStr = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Manila", minute: "2-digit" }).format(apptDate);
+        const dayStr = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Manila", weekday: "short" }).format(apptDate);
+
+        const apptHour = parseInt(hourStr, 10);
+        const apptMinutes = parseInt(minStr, 10);
+        const isWeekend = (dayStr === "Sat" || dayStr === "Sun");
+
         const VALID_HOURS= [8, 9, 10, 11, 13, 14, 15, 16, 17];
 
         if(VALID_HOURS.indexOf(apptHour) === -1){
@@ -23,14 +37,13 @@ const createAppointment= async (req, res) => {
             });
         }
 
-        if(apptDate.getMinutes() !== 0){
+        if(apptMinutes !== 0){
             return res.status(400).json({
                 message: "Appointments must be scheduled on the hour (e.g. 8:00 AM, 9:00 AM)."
             });
         }
 
-        const dayOfWeek= apptDate.getDay();
-        if(dayOfWeek === 0 || dayOfWeek === 6){
+        if(isWeekend){
             return res.status(400).json({
                 message: "Appointments are only available Monday to Friday."
             });
@@ -122,25 +135,32 @@ const updateAppointment= async (req, res) => {
 
         if(appointmentDate && status !== "Cancelled"){
             const reqDate = new Date(appointmentDate);
-            const conflict = await Appointment.findOne({
-                _id: { $ne: req.params.id },
-                appointmentDate: { $gte: new Date(reqDate.getTime() - 50 * 60 * 1000), $lte: new Date(reqDate.getTime() + 50 * 60 * 1000) },
-                status: { $ne: "Cancelled" }
-            });
-            if(conflict){
-                return res.status(400).json({
-                    message: "This time slot is already booked."
+            const isDateChanged = !existing.appointmentDate || Math.abs(new Date(existing.appointmentDate).getTime() - reqDate.getTime()) > 60000;
+            if(isDateChanged){
+                const conflict = await Appointment.findOne({
+                    _id: { $ne: req.params.id },
+                    appointmentDate: { $gte: new Date(reqDate.getTime() - 50 * 60 * 1000), $lte: new Date(reqDate.getTime() + 50 * 60 * 1000) },
+                    status: { $ne: "Cancelled" }
                 });
+                if(conflict){
+                    return res.status(400).json({
+                        message: "This time slot is already booked."
+                    });
+                }
             }
         }
 
+        const updatePayload = {
+            appointmentDate: appointmentDate || existing.appointmentDate,
+            reason: reason || existing.reason,
+            status: status || existing.status
+        };
+        if(patientId){
+            updatePayload.patientId = patientId;
+        }
+
         const appointment= await Appointment.findByIdAndUpdate(req.params.id,
-            {
-                patientId: patientId,
-                appointmentDate: appointmentDate,
-                reason: reason,
-                status: status
-            },
+            updatePayload,
             {
                 returnDocument: "after",
                 runValidators: true

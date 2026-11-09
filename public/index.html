@@ -75,6 +75,9 @@
                     <span class="nav-text">APPOINTMENTS</span>
                 </button>
             </div>
+            <div class="sidebar-footer">
+                <p class="sidebar-copyright">&copy; 2026 MediSched.<br>All rights reserved.</p>
+            </div>
         </aside>
 
         <main id="mainContent" class="main-content">
@@ -305,11 +308,14 @@
             <p class="appt-modal-subtitle">Enter the appointment details below</p>
             <div class="appt-modal-grid">
                 <div class="appt-modal-col">
-                    <div class="modal-field">
-                        <label class="modal-label-bold">Patient</label>
-                        <select id="apptPatientSelect" class="appt-input">
-                            <option value="">Select patient</option>
-                        </select>
+                    <div class="modal-field auto-suggest-container">
+                        <label class="modal-label-bold">Patient <span style="color: #DC2626;">*</span></label>
+                        <div class="patient-search-wrapper">
+                            <input id="apptPatientSearch" type="text" placeholder="Search patient by name or contact..." class="appt-input" autocomplete="off">
+                            <input id="apptPatientId" type="hidden">
+                            <button type="button" id="clearPatientSearchBtn" class="patient-search-clear hidden" title="Clear selection">&times;</button>
+                        </div>
+                        <div id="patientSuggestionsList" class="suggestions-dropdown hidden"></div>
                     </div>
                     <div class="modal-field">
                         <label class="modal-label-bold">Reason</label>

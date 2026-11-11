@@ -239,7 +239,7 @@
                 </div>
             </div>
             <div class="modal-actions-center">
-                <button id="cancelPatientBtn" class="btn-outline">Cancel</button>
+                <button type="button" id="cancelPatientBtn" class="btn-cancel">Cancel</button>
                 <button id="submitPatientBtn" class="btn-brown">Submit</button>
             </div>
         </div>
@@ -345,8 +345,8 @@
                         <small id="apptTimeHint" class="field-hint">12:00 PM is lunch break (No appointments)</small>
                     </div>
                     <div class="appt-actions-right">
-                        <button id="clearApptBtn" class="btn-clear-form">Clear Form</button>
-                        <button id="cancelApptBtn" class="btn-clear-form">Cancel</button>
+                        <button type="button" id="clearApptBtn" class="btn-clear-form">Clear Form</button>
+                        <button type="button" id="cancelApptBtn" class="btn-cancel btn-clear-form">Cancel</button>
                         <button id="saveApptBtn" class="btn-brown">Save Appointment</button>
                     </div>
                 </div>
@@ -375,7 +375,7 @@
         </div>
     </div>
 
-    <div id="alertModal" class="modal-overlay hidden">
+    <div id="alertModal" class="modal-overlay hidden" style="z-index: 2000;">
         <div class="signout-box">
             <h3 id="alertTitle" class="signout-title" style="margin-bottom: 12px;">Notice</h3>
             <p id="alertMessage" class="modal-subtitle" style="text-align: center; margin-bottom: 24px;">Please fill in

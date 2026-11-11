@@ -46,8 +46,14 @@ function getManilaDateString(dateObj) {
 
 function formatPatientName(p) {
     if (!p) return ""
-    let mid = p.middleName ? " " + p.middleName + " " : " "
-    return (p.firstName + mid + p.lastName).replace(/\s+/g, " ").trim()
+    let fullName = p.firstName || ""
+    if (p.middleName && p.middleName.trim() !== "") {
+        fullName += " " + p.middleName.trim()
+    }
+    if (p.lastName && p.lastName.trim() !== "") {
+        fullName += " " + p.lastName.trim()
+    }
+    return fullName.trim()
 }
 
 function sortAppointments(list) {
@@ -241,17 +247,23 @@ function renderAppointmentsTable() {
     if (searchInputEl && searchInputEl.value.trim().length > 0) {
         let query = searchInputEl.value.trim().toLowerCase()
         let rows = document.querySelectorAll("#apptTableBody tr")
-        rows.forEach(function (row) {
+        for (let i = 0; i < rows.length; i++) {
+            let row = rows[i]
             let cells = row.querySelectorAll("td")
-            if (cells.length < 4) return
-            let patientText = cells[0].textContent.toLowerCase()
-            let dateText = cells[1].textContent.toLowerCase()
-            let reasonText = cells[2].textContent.toLowerCase()
-            let statusSelect = cells[3].querySelector("select")
-            let statusText = statusSelect ? statusSelect.value.toLowerCase() : ""
-            let rowSearchable = patientText + " " + dateText + " " + reasonText + " " + statusText
-            row.style.display = rowSearchable.includes(query) ? "" : "none"
-        })
+            if (cells.length >= 4) {
+                let patientText = cells[0].textContent.toLowerCase()
+                let dateText = cells[1].textContent.toLowerCase()
+                let reasonText = cells[2].textContent.toLowerCase()
+                let statusSelect = cells[3].querySelector("select")
+                let statusText = statusSelect ? statusSelect.value.toLowerCase() : ""
+                let rowSearchable = patientText + " " + dateText + " " + reasonText + " " + statusText
+                if (rowSearchable.indexOf(query) !== -1) {
+                    row.style.display = ""
+                } else {
+                    row.style.display = "none"
+                }
+            }
+        }
     }
 }
 
@@ -265,6 +277,10 @@ document.querySelectorAll(".appt-sort-th").forEach(function (th) {
             currentSortDir = "asc"
         }
         renderAppointmentsTable()
+        let searchInput = document.getElementById("searchInput")
+        if (searchInput && searchInput.value) {
+            searchInput.dispatchEvent(new Event("input"))
+        }
     })
 })
 
@@ -286,6 +302,9 @@ function loadAppointments() {
 
 function updateTimeSlots() {
     let dateInput = document.getElementById("apptDateInput")
+    if (!dateInput || dateInput.tagName !== "INPUT") {
+        dateInput = document.getElementById("apptDate")
+    }
     let timeSelect = document.getElementById("apptTimeSlot")
     let hint = document.getElementById("apptTimeHint")
     if (!dateInput || !timeSelect) return
@@ -305,9 +324,9 @@ function updateTimeSlots() {
 
     if (!dateValue) {
         timeSelect.innerHTML = '<option value="">Select a time slot</option>'
-        allSlots.forEach(function (slot) {
-            timeSelect.innerHTML += '<option value="' + slot.value + '">' + slot.label + '</option>'
-        })
+        for (let i = 0; i < allSlots.length; i++) {
+            timeSelect.innerHTML += '<option value="' + allSlots[i].value + '">' + allSlots[i].label + '</option>'
+        }
         timeSelect.disabled = false
         saveApptBtn.disabled = false
         saveApptBtn.classList.remove("btn-disabled")
@@ -354,8 +373,11 @@ function updateTimeSlots() {
     saveApptBtn.classList.remove("btn-disabled")
 
     let bookedHours = []
-    allAppointments.forEach(function (appt) {
-        if (appt.status === "Cancelled") return
+    for (let i = 0; i < allAppointments.length; i++) {
+        let appt = allAppointments[i]
+        if (appt.status === "Cancelled") {
+            continue
+        }
         let d = new Date(appt.appointmentDate)
         let apptDateStr = getManilaDateString(d)
 
@@ -367,45 +389,44 @@ function updateTimeSlots() {
             }).format(d)
             bookedHours.push(hourStr + ":00")
         }
-    })
+    }
 
-    let todayStr = getManilaDateString(new Date())
+    let now = new Date()
+    let todayStr = getManilaDateString(now)
     let isToday = (dateValue === todayStr)
-    let currentManilaHour = parseInt(new Intl.DateTimeFormat("en-GB", {
-        timeZone: "Asia/Manila",
-        hour: "2-digit",
-        hourCycle: "h23"
-    }).format(new Date()), 10)
+    let currentHour = now.getHours()
 
     timeSelect.innerHTML = '<option value="">Select a time slot</option>'
     let availableCount = 0
 
-    allSlots.forEach(function (slot) {
+    for (let i = 0; i < allSlots.length; i++) {
+        let slot = allSlots[i]
         let isBooked = bookedHours.indexOf(slot.value) !== -1
         let slotHour = parseInt(slot.value.split(":")[0], 10)
-        let isPast = isToday && (slotHour <= currentManilaHour)
+        let isPast = isToday && (slotHour <= currentHour)
 
         if (isBooked) {
             timeSelect.innerHTML += '<option value="' + slot.value + '" disabled class="disabled">' + slot.label + ' (Booked)</option>'
         } else if (isPast) {
-            timeSelect.innerHTML += '<option value="' + slot.value + '" disabled class="disabled">' + slot.label + ' (Past)</option>'
+            timeSelect.innerHTML += '<option value="' + slot.value + '" disabled class="disabled">' + slot.label + ' (Unavailable)</option>'
         } else {
             timeSelect.innerHTML += '<option value="' + slot.value + '">' + slot.label + '</option>'
             availableCount++
         }
-    })
+    }
 
     let slotButtons = document.querySelectorAll(".slot-btn, button[data-slot], .time-slot-btn, button.slot")
-    slotButtons.forEach(function (slotBtn) {
+    for (let i = 0; i < slotButtons.length; i++) {
+        let slotBtn = slotButtons[i]
         let slotVal = slotBtn.getAttribute("data-slot") || slotBtn.value
         if (slotVal) {
             let slotHour = parseInt(slotVal.split(":")[0], 10)
-            if (isToday && slotHour <= currentManilaHour) {
+            if (isToday && slotHour <= currentHour) {
                 slotBtn.disabled = true
                 slotBtn.classList.add("disabled")
             }
         }
-    })
+    }
 
     if (hint) {
         if (availableCount === 0) {
@@ -564,6 +585,9 @@ if (clearPatientSearchBtn) {
 
 addApptBtn.addEventListener("click", function () {
     let dateInput = document.getElementById("apptDateInput")
+    if (!dateInput || dateInput.tagName !== "INPUT") {
+        dateInput = document.getElementById("apptDate")
+    }
     let timeSelect = document.getElementById("apptTimeSlot")
     if (dateInput) dateInput.value = ""
     if (timeSelect) timeSelect.value = ""
@@ -624,28 +648,45 @@ apptModal.addEventListener("click", function (e) {
 let cancelApptBtn = document.getElementById("cancelApptBtn")
 if (cancelApptBtn) {
     cancelApptBtn.addEventListener("click", function () {
-        apptModal.classList.add("hidden")
-        resetPatientSelection()
+        if (apptModal) {
+            apptModal.classList.add("hidden")
+        } else {
+            let am = document.getElementById("apptModal")
+            if (am) am.classList.add("hidden")
+        }
+        if (typeof resetPatientSelection === "function") {
+            resetPatientSelection()
+        }
         let dateInput = document.getElementById("apptDateInput")
+        if (!dateInput || dateInput.tagName !== "INPUT") {
+            dateInput = document.getElementById("apptDate")
+        }
         let timeSelect = document.getElementById("apptTimeSlot")
         if (dateInput) dateInput.value = ""
         if (timeSelect) timeSelect.value = ""
         let reasonInput = document.getElementById("apptReason")
         if (reasonInput) reasonInput.value = ""
-        saveApptBtn.disabled = false
-        saveApptBtn.classList.remove("btn-disabled")
+        if (saveApptBtn) {
+            saveApptBtn.disabled = false
+            saveApptBtn.classList.remove("btn-disabled")
+        }
         let hint = document.getElementById("apptTimeHint")
         if (hint) {
             hint.textContent = "12:00 PM is lunch break (No appointments)"
             hint.style.color = "#888888"
         }
-        updateTimeSlots()
+        if (typeof updateTimeSlots === "function") {
+            updateTimeSlots()
+        }
     })
 }
 
 clearApptBtn.addEventListener("click", function () {
     resetPatientSelection()
     let dateInput = document.getElementById("apptDateInput")
+    if (!dateInput || dateInput.tagName !== "INPUT") {
+        dateInput = document.getElementById("apptDate")
+    }
     let timeSelect = document.getElementById("apptTimeSlot")
     if (dateInput) dateInput.value = ""
     if (timeSelect) timeSelect.value = ""
@@ -663,6 +704,19 @@ clearApptBtn.addEventListener("click", function () {
 let dateInputEl = document.getElementById("apptDateInput")
 if (dateInputEl) {
     dateInputEl.addEventListener("change", function () {
+        updateTimeSlots()
+    })
+    dateInputEl.addEventListener("input", function () {
+        updateTimeSlots()
+    })
+}
+
+let apptDateEl = document.getElementById("apptDate")
+if (apptDateEl && apptDateEl.tagName === "INPUT") {
+    apptDateEl.addEventListener("change", function () {
+        updateTimeSlots()
+    })
+    apptDateEl.addEventListener("input", function () {
         updateTimeSlots()
     })
 }
@@ -694,6 +748,13 @@ document.addEventListener("click", function (e) {
 
 document.addEventListener("keydown", function (e) {
     if (e.key === "Escape") {
+        let modalIds = ["patientModal", "editPatientModal", "apptModal", "alertModal", "signOutModal", "confirmDeleteModal", "patientSuccessModal", "apptSuccessModal"]
+        modalIds.forEach(function (id) {
+            let modal = document.getElementById(id)
+            if (modal) {
+                modal.classList.add("hidden")
+            }
+        })
         let modals = document.querySelectorAll(".modal-overlay")
         modals.forEach(function (m) {
             m.classList.add("hidden")
@@ -701,65 +762,36 @@ document.addEventListener("keydown", function (e) {
     }
 })
 
-function validateAppointmentForm(patientId, dateValue, timeValue, reason, patientSearchVal) {
-    if (!patientId) {
-        if (patientSearchVal && patientSearchVal.trim()) {
-            return "Please select a patient from the auto-suggest list."
-        }
+function validateAppointmentForm(patientId, dateValue, timeValue, reason) {
+    if (!patientId || patientId.trim() === "") {
         return "Please search and select a patient."
     }
 
-    if (!dateValue) {
+    if (!dateValue || dateValue.trim() === "") {
         return "Please select an appointment date."
     }
 
-    let parts = dateValue.split("-")
-    if (parts.length !== 3) {
-        return "Invalid date format."
-    }
-
-    let chosenDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10))
-    let today = new Date()
-    today.setHours(0, 0, 0, 0)
-    chosenDate.setHours(0, 0, 0, 0)
-
-    if (chosenDate < today) {
-        return "Appointment date cannot be in the past. Please select today or a future date."
-    }
-
-    let dayOfWeek = chosenDate.getDay()
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
-        return "Appointments are only available Monday to Friday."
-    }
-
-    if (!timeValue) {
+    if (!timeValue || timeValue.trim() === "") {
         return "Please select an appointment time slot."
     }
 
-    let validSlots = ["08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00", "17:00"]
-    if (validSlots.indexOf(timeValue) === -1) {
-        return "Invalid time slot. Office hours are 8:00 AM - 5:00 PM with 12:00 PM lunch break."
-    }
-
-    let todayStr = getManilaDateString(new Date())
-    if (dateValue === todayStr) {
-        let currentManilaHour = parseInt(new Intl.DateTimeFormat("en-GB", {
-            timeZone: "Asia/Manila",
-            hour: "2-digit",
-            hourCycle: "h23"
-        }).format(new Date()), 10)
-        let slotHour = parseInt(timeValue.split(":")[0], 10)
-        if (slotHour <= currentManilaHour) {
-            return "Cannot select a past time slot for today."
-        }
-    }
-
-    if (!reason) {
+    if (!reason || reason.trim() === "") {
         return "Please enter a reason for the appointment."
     }
 
-    if (reason.length < 2) {
-        return "Appointment reason must be at least 2 characters long."
+    if (timeValue === "12:00") {
+        return "12:00 PM is lunch break."
+    }
+
+    let apptDate = new Date(dateValue + "T" + timeValue)
+    let now = new Date()
+
+    if (apptDate.getDay() === 0 || apptDate.getDay() === 6) {
+        return "Appointments are only available Monday to Friday."
+    }
+
+    if (apptDate < now) {
+        return "Appointment date and time cannot be in the past."
     }
 
     return null
@@ -771,12 +803,15 @@ saveApptBtn.addEventListener("click", function () {
     let patientId = patientIdInput ? patientIdInput.value.trim() : ""
     let patientSearchVal = patientSearchInput ? patientSearchInput.value.trim() : ""
     let dateInput = document.getElementById("apptDateInput")
+    if (!dateInput || dateInput.tagName !== "INPUT") {
+        dateInput = document.getElementById("apptDate")
+    }
     let timeSelect = document.getElementById("apptTimeSlot")
     let dateValue = dateInput ? dateInput.value : ""
     let timeValue = timeSelect ? timeSelect.value : ""
     let reason = document.getElementById("apptReason").value.trim()
 
-    let error = validateAppointmentForm(patientId, dateValue, timeValue, reason, patientSearchVal)
+    let error = validateAppointmentForm(patientId, dateValue, timeValue, reason)
     if (error) {
         if (typeof showAlert === "function") {
             showAlert(error, "Invalid Appointment Details")

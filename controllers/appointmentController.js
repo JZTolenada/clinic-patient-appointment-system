@@ -6,84 +6,55 @@ const createAppointment = async (req, res) => {
         const { patientId, appointmentDate, reason } = req.body;
 
         if (!patientId) {
-            return res.status(400).json({
-                message: "Please select a patient."
-            });
+            return res.status(400).json({ message: "Please select a patient." });
+        }
+
+        if (!appointmentDate) {
+            return res.status(400).json({ message: "Please provide an appointment date and time." });
+        }
+
+        if (!reason || reason.trim() === "") {
+            return res.status(400).json({ message: "Please provide a reason." });
         }
 
         const patient = await Patient.findById(patientId);
         if (!patient) {
-            return res.status(404).json({
-                message: "Selected patient was not found."
-            });
-        }
-
-        if (!appointmentDate) {
-            return res.status(400).json({
-                message: "Appointment date and time are required."
-            });
+            return res.status(404).json({ message: "Selected patient was not found." });
         }
 
         const apptDate = new Date(appointmentDate);
-        if (isNaN(apptDate.getTime())) {
-            return res.status(400).json({
-                message: "Invalid appointment date format."
-            });
-        }
-
         const now = new Date();
+
         if (apptDate < now) {
-            return res.status(400).json({
-                message: "Appointment date and time cannot be in the past."
-            });
+            return res.status(400).json({ message: "Appointment date cannot be in the past." });
         }
 
-        const hourStr = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Manila", hour: "2-digit", hourCycle: "h23" }).format(apptDate);
-        const minStr = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Manila", minute: "2-digit" }).format(apptDate);
-        const dayStr = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Manila", weekday: "short" }).format(apptDate);
-
-        const apptHour = parseInt(hourStr, 10);
-        const apptMinutes = parseInt(minStr, 10);
-        const isWeekend = (dayStr === "Sat" || dayStr === "Sun");
-
-        const VALID_HOURS = [8, 9, 10, 11, 13, 14, 15, 16, 17];
-
-        if (VALID_HOURS.indexOf(apptHour) === -1) {
-            return res.status(400).json({
-                message: "Appointments are only available from 8:00 AM - 11:00 AM and 1:00 PM - 5:00 PM. 12:00 PM is lunch break."
-            });
+        const day = apptDate.getDay();
+        if (day === 0 || day === 6) {
+            return res.status(400).json({ message: "Appointments are only available Monday to Friday." });
         }
 
-        if (apptMinutes !== 0) {
-            return res.status(400).json({
-                message: "Appointments must be scheduled on the hour (e.g. 8:00 AM, 9:00 AM)."
-            });
+        const hours = apptDate.getHours();
+        if (hours === 12) {
+            return res.status(400).json({ message: "12:00 PM is lunch break." });
         }
 
-        if (isWeekend) {
-            return res.status(400).json({
-                message: "Appointments are only available Monday to Friday."
-            });
+        if (![8, 9, 10, 11, 13, 14, 15, 16, 17].includes(hours)) {
+            return res.status(400).json({ message: "Appointments must be between 8:00 AM - 11:00 AM or 1:00 PM - 5:00 PM." });
         }
 
-        if (!reason || typeof reason !== "string" || reason.trim().length < 2) {
-            return res.status(400).json({
-                message: "Please provide a valid reason for the appointment (at least 2 characters)."
-            });
-        }
-
-        const startOfSlot = new Date(apptDate.getTime() - 50 * 60 * 1000);
-        const endOfSlot = new Date(apptDate.getTime() + 50 * 60 * 1000);
+        const startOfSlot = new Date(apptDate);
+        startOfSlot.setMinutes(0, 0, 0);
+        const endOfSlot = new Date(apptDate);
+        endOfSlot.setMinutes(59, 59, 999);
 
         const conflict = await Appointment.findOne({
             appointmentDate: { $gte: startOfSlot, $lte: endOfSlot },
-            status: { $ne: "Cancelled" }
+            status: "Scheduled"
         });
 
         if (conflict) {
-            return res.status(400).json({
-                message: "This time slot is already booked. Please choose another time slot."
-            });
+            return res.status(400).json({ message: "This time slot is already booked." });
         }
 
         const appointment = new Appointment({

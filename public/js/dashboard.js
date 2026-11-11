@@ -18,7 +18,8 @@ function loadDashboard() {
             let completedCount = 0
             let cancelledCount = 0
 
-            appointments.forEach(function (appt) {
+            for (let i = 0; i < appointments.length; i++) {
+                let appt = appointments[i]
                 let d = new Date(appt.appointmentDate)
                 let apptDateStr = new Intl.DateTimeFormat("en-CA", {
                     timeZone: "Asia/Manila",
@@ -39,7 +40,7 @@ function loadDashboard() {
                 if (appt.status === "Cancelled") {
                     cancelledCount++
                 }
-            })
+            }
 
             let elToday = document.getElementById("statToday")
             let elScheduled = document.getElementById("statScheduled") || document.getElementById("statPending")

@@ -32,49 +32,24 @@ function triggerAlert(message, title) {
 }
 
 function validatePatientForm(first, middle, last, phone, age, gender) {
-    let nameRegex = /^[A-Za-z\s\-'.]+$/
-    let phoneDigits = phone.replace(/[\s\-]/g, "")
-
-    if (!first) {
+    if (!first || first.trim() === "") {
         return "First name is required."
     }
-    if (first.length < 2 || !nameRegex.test(first)) {
-        return "First name must only contain letters and be at least 2 characters long."
-    }
-
-    if (!middle) {
+    if (!middle || middle.trim() === "") {
         return "Middle name is required."
     }
-    if (!nameRegex.test(middle)) {
-        return "Middle name must only contain letters."
-    }
-
-    if (!last) {
+    if (!last || last.trim() === "") {
         return "Last name is required."
     }
-    if (last.length < 2 || !nameRegex.test(last)) {
-        return "Last name must only contain letters and be at least 2 characters long."
+    if (!phone || phone.length !== 11 || !phone.startsWith("09")) {
+        return "Contact number must be an 11-digit mobile number starting with 09."
     }
-
-    if (!phone) {
-        return "Contact number is required."
+    if (!age || isNaN(age) || age < 1 || age > 120) {
+        return "Age must be a valid number between 1 and 120."
     }
-    if (!/^09\d{9}$/.test(phoneDigits)) {
-        return "Contact number must be an 11-digit mobile number starting with 09 (e.g., 09123456789)."
+    if (!gender || gender === "") {
+        return "Please select a valid gender."
     }
-
-    if (!age && age !== 0) {
-        return "Age is required."
-    }
-    let ageNum = Number(age)
-    if (isNaN(ageNum) || !Number.isInteger(ageNum) || ageNum < 0 || ageNum > 125) {
-        return "Age must be a valid whole number between 0 and 125."
-    }
-
-    if (!gender || (gender !== "Male" && gender !== "Female")) {
-        return "Please select a valid gender (Male or Female)."
-    }
-
     return null
 }
 
@@ -220,18 +195,36 @@ patientModal.addEventListener("click", function (e) {
 let cancelPatientBtn = document.getElementById("cancelPatientBtn")
 if (cancelPatientBtn) {
     cancelPatientBtn.addEventListener("click", function () {
-        document.getElementById("pFirstName").value = ""
-        document.getElementById("pMiddleName").value = ""
-        document.getElementById("pLastName").value = ""
-        document.getElementById("pPhone").value = ""
-        document.getElementById("pAge").value = ""
-        document.getElementById("pGender").value = ""
-        patientModal.classList.add("hidden")
+        let fName = document.getElementById("pFirstName")
+        let mName = document.getElementById("pMiddleName")
+        let lName = document.getElementById("pLastName")
+        let phone = document.getElementById("pPhone")
+        let age = document.getElementById("pAge")
+        let gender = document.getElementById("pGender")
+        if (fName) fName.value = ""
+        if (mName) mName.value = ""
+        if (lName) lName.value = ""
+        if (phone) phone.value = ""
+        if (age) age.value = ""
+        if (gender) gender.value = ""
+        if (patientModal) {
+            patientModal.classList.add("hidden")
+        } else {
+            let pm = document.getElementById("patientModal")
+            if (pm) pm.classList.add("hidden")
+        }
     })
 }
 
 document.addEventListener("keydown", function (e) {
     if (e.key === "Escape") {
+        let modalIds = ["patientModal", "editPatientModal", "apptModal", "alertModal", "signOutModal", "confirmDeleteModal", "patientSuccessModal", "apptSuccessModal"]
+        modalIds.forEach(function (id) {
+            let modal = document.getElementById(id)
+            if (modal) {
+                modal.classList.add("hidden")
+            }
+        })
         let modals = document.querySelectorAll(".modal-overlay")
         modals.forEach(function (m) {
             m.classList.add("hidden")
@@ -272,7 +265,7 @@ submitPatientBtn.addEventListener("click", function () {
             lastName: last,
             age: parseInt(age),
             sex: gender,
-            phone: phone.replace(/[\s\-]/g, "")
+            phone: phone
         })
     })
         .then(function (response) {
@@ -322,7 +315,7 @@ submitEditPatientBtn.addEventListener("click", function () {
             lastName: last,
             age: parseInt(age),
             sex: gender,
-            phone: phone.replace(/[\s\-]/g, "")
+            phone: phone
         })
     })
         .then(function (response) {

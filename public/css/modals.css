@@ -417,7 +417,28 @@ select.appt-input {
 }
 
 #alertModal {
-    z-index: 1100;
+    z-index: 2000;
+}
+
+.btn-cancel {
+    background: #ffffff;
+    color: #555555;
+    border: 1px solid #aaaaaa;
+    border-radius: 9999px;
+    padding: 9px 24px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.15s ease;
+}
+
+.btn-cancel:hover {
+    background: #f0f0f0;
+    transform: translateY(-1px);
+}
+
+.btn-cancel:active {
+    transform: translateY(0);
 }
 
 .suggestions-dropdown {

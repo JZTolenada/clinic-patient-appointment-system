@@ -4,6 +4,7 @@ function loadDashboard() {
             return response.json()
         })
         .then(function (appointments) {
+            if (!Array.isArray(appointments)) return
             let today = new Date()
             let todayStr = new Intl.DateTimeFormat("en-CA", {
                 timeZone: "Asia/Manila",
@@ -26,7 +27,7 @@ function loadDashboard() {
                     day: "2-digit"
                 }).format(d)
 
-                if (apptDateStr === todayStr) {
+                if (apptDateStr === todayStr && appt.status !== "Cancelled") {
                     todayCount++
                 }
                 if (appt.status === "Scheduled") {

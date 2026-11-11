@@ -121,6 +121,7 @@
 .modal-actions-center {
     display: flex;
     justify-content: center;
+    gap: 12px;
     margin-top: 20px;
 }
 
@@ -413,6 +414,10 @@ select.appt-input {
 .patient-search-clear:hover {
     color: #111111;
     background: #e8e2d8;
+}
+
+#alertModal {
+    z-index: 1100;
 }
 
 .suggestions-dropdown {

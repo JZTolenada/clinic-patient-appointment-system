@@ -79,11 +79,23 @@ loginBtn.addEventListener("click", function () {
     }
 })
 
-document.getElementById("loginPassword").addEventListener("keydown", function (e) {
-    if (e.key === "Enter") {
-        loginBtn.click()
-    }
-})
+let loginUsernameInput = document.getElementById("loginUsername")
+if (loginUsernameInput) {
+    loginUsernameInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+            loginBtn.click()
+        }
+    })
+}
+
+let loginPasswordInput = document.getElementById("loginPassword")
+if (loginPasswordInput) {
+    loginPasswordInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+            loginBtn.click()
+        }
+    })
+}
 
 let signOutModal = document.getElementById("signOutModal")
 let cancelSignOutBtn = document.getElementById("cancelSignOutBtn")

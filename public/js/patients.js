@@ -84,6 +84,7 @@ function loadPatients() {
             return response.json()
         })
         .then(function (patients) {
+            if (!Array.isArray(patients)) return
             allPatientsData = patients
             let tbody = document.getElementById("patientTableBody")
             tbody.innerHTML = ""
@@ -150,6 +151,9 @@ function loadPatients() {
                 })
             })
         })
+        .catch(function () {
+            triggerAlert("Failed to load patients. Please try again.", "Error")
+        })
 }
 
 cancelDeletePatientBtn.addEventListener("click", function () {
@@ -210,6 +214,28 @@ addPatientBtn.addEventListener("click", function () {
 patientModal.addEventListener("click", function (e) {
     if (e.target === patientModal) {
         patientModal.classList.add("hidden")
+    }
+})
+
+let cancelPatientBtn = document.getElementById("cancelPatientBtn")
+if (cancelPatientBtn) {
+    cancelPatientBtn.addEventListener("click", function () {
+        document.getElementById("pFirstName").value = ""
+        document.getElementById("pMiddleName").value = ""
+        document.getElementById("pLastName").value = ""
+        document.getElementById("pPhone").value = ""
+        document.getElementById("pAge").value = ""
+        document.getElementById("pGender").value = ""
+        patientModal.classList.add("hidden")
+    })
+}
+
+document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") {
+        let modals = document.querySelectorAll(".modal-overlay")
+        modals.forEach(function (m) {
+            m.classList.add("hidden")
+        })
     }
 })
 

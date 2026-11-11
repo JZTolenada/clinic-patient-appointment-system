@@ -137,7 +137,7 @@ function renderAppointmentsTable() {
                 sel.value = "Cancelled"
                 sel.className = "status-pill status-cancelled status-select"
                 if (typeof showAlert === "function") {
-                    showAlert("Cancelled appointments cannot be put back to Scheduled. Please create a new appointment.")
+                    showAlert("Cancelled appointments cannot be put back to Scheduled. Please create a new appointment.", "Invalid Status Change")
                 }
                 return
             }
@@ -146,7 +146,7 @@ function renderAppointmentsTable() {
                 sel.value = prevStatus
                 sel.className = "status-pill status-" + prevStatus.toLowerCase() + " status-select"
                 if (typeof showAlert === "function") {
-                    showAlert("Appointments can only be marked as Completed during or after the appointment date.")
+                    showAlert("Appointments can only be marked as Completed during or after the appointment date.", "Invalid Status Change")
                 }
                 return
             }
@@ -189,10 +189,21 @@ function renderAppointmentsTable() {
                 })
             })
                 .then(function (response) {
-                    return response.json()
+                    return response.json().then(function (data) {
+                        return { ok: response.ok, data: data }
+                    })
                 })
-                .then(function (data) {
+                .then(function (result) {
+                    if (!result.ok && typeof showAlert === "function") {
+                        showAlert(result.data.message || "Failed to update appointment status.", "Update Error")
+                        return
+                    }
                     if (typeof loadDashboard === "function") loadDashboard()
+                })
+                .catch(function () {
+                    if (typeof showAlert === "function") {
+                        showAlert("A network error occurred while updating the appointment.", "Network Error")
+                    }
                 })
         })
     })
@@ -260,8 +271,23 @@ function updateTimeSlots() {
 
     let parts = dateValue.split("-")
     let chosenDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
-    let dayOfWeek = chosenDate.getDay()
+    let today = new Date()
+    today.setHours(0, 0, 0, 0)
+    chosenDate.setHours(0, 0, 0, 0)
 
+    if (chosenDate < today) {
+        timeSelect.innerHTML = '<option value="">Date is in the past</option>'
+        timeSelect.disabled = true
+        saveApptBtn.disabled = true
+        saveApptBtn.classList.add("btn-disabled")
+        if (hint) {
+            hint.textContent = "Appointment date cannot be in the past."
+            hint.style.color = "#DC2626"
+        }
+        return
+    }
+
+    let dayOfWeek = chosenDate.getDay()
     if (dayOfWeek === 0 || dayOfWeek === 6) {
         timeSelect.innerHTML = '<option value="">Not available on weekends</option>'
         timeSelect.disabled = true
@@ -404,6 +430,54 @@ if (dateInputEl) {
     })
 }
 
+function validateAppointmentForm(patientId, dateValue, timeValue, reason) {
+    if (!patientId) {
+        return "Please select a patient from the list."
+    }
+
+    if (!dateValue) {
+        return "Please select an appointment date."
+    }
+
+    let parts = dateValue.split("-")
+    if (parts.length !== 3) {
+        return "Invalid date format."
+    }
+
+    let chosenDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
+    let today = new Date()
+    today.setHours(0, 0, 0, 0)
+    chosenDate.setHours(0, 0, 0, 0)
+
+    if (chosenDate < today) {
+        return "Appointment date cannot be in the past. Please select today or a future date."
+    }
+
+    let dayOfWeek = chosenDate.getDay()
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+        return "Appointments are only available Monday to Friday."
+    }
+
+    if (!timeValue) {
+        return "Please select an appointment time slot."
+    }
+
+    let validSlots = ["08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00", "17:00"]
+    if (validSlots.indexOf(timeValue) === -1) {
+        return "Invalid time slot. Office hours are 8:00 AM - 5:00 PM with 12:00 PM lunch break."
+    }
+
+    if (!reason) {
+        return "Please enter a reason for the appointment."
+    }
+
+    if (reason.length < 2) {
+        return "Appointment reason must be at least 2 characters long."
+    }
+
+    return null
+}
+
 saveApptBtn.addEventListener("click", function () {
     if (saveApptBtn.disabled) return
 
@@ -412,10 +486,13 @@ saveApptBtn.addEventListener("click", function () {
     let timeSelect = document.getElementById("apptTimeSlot")
     let dateValue = dateInput ? dateInput.value : ""
     let timeValue = timeSelect ? timeSelect.value : ""
-    let reason = document.getElementById("apptReason").value.trim() || "Consultation"
+    let reason = document.getElementById("apptReason").value.trim()
 
-    if (!patientId || !dateValue || !timeValue) {
-        showAlert("Please select a patient, appointment date, and time slot.")
+    let error = validateAppointmentForm(patientId, dateValue, timeValue, reason)
+    if (error) {
+        if (typeof showAlert === "function") {
+            showAlert(error, "Invalid Appointment Details")
+        }
         return
     }
 
@@ -439,7 +516,9 @@ saveApptBtn.addEventListener("click", function () {
         })
         .then(function (result) {
             if (!result.ok) {
-                showAlert(result.data.message || "Failed to book appointment.")
+                if (typeof showAlert === "function") {
+                    showAlert(result.data.message || "Failed to book appointment.", "Booking Error")
+                }
                 return
             }
             apptModal.classList.add("hidden")
@@ -451,7 +530,9 @@ saveApptBtn.addEventListener("click", function () {
             }, 2000)
         })
         .catch(function () {
-            showAlert("An error occurred while creating the appointment.")
+            if (typeof showAlert === "function") {
+                showAlert("A network error occurred while scheduling the appointment.", "Network Error")
+            }
         })
 })
 

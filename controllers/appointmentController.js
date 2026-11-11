@@ -1,59 +1,89 @@
-const Appointment= require("../models/Appointment");
-const Patient= require("../models/Patient");
+const Appointment = require("../models/Appointment");
+const Patient = require("../models/Patient");
 
-const createAppointment= async (req, res) => {
-    try{
-        const { patientId, appointmentDate, reason }= req.body;
+const createAppointment = async (req, res) => {
+    try {
+        const { patientId, appointmentDate, reason } = req.body;
 
-        const patient= await Patient.findById(patientId);
-
-        if(!patient){
-            return res.status(404).json({
-                message: "Patient not found."
+        if (!patientId) {
+            return res.status(400).json({
+                message: "Please select a patient."
             });
         }
 
-        const apptDate= new Date(appointmentDate);
-        const apptHour= apptDate.getHours();
-        const VALID_HOURS= [8, 9, 10, 11, 13, 14, 15, 16, 17];
+        const patient = await Patient.findById(patientId);
+        if (!patient) {
+            return res.status(404).json({
+                message: "Selected patient was not found."
+            });
+        }
 
-        if(VALID_HOURS.indexOf(apptHour) === -1){
+        if (!appointmentDate) {
+            return res.status(400).json({
+                message: "Appointment date and time are required."
+            });
+        }
+
+        const apptDate = new Date(appointmentDate);
+        if (isNaN(apptDate.getTime())) {
+            return res.status(400).json({
+                message: "Invalid appointment date format."
+            });
+        }
+
+        const now = new Date();
+        if (apptDate < now) {
+            return res.status(400).json({
+                message: "Appointment date and time cannot be in the past."
+            });
+        }
+
+        const VALID_HOURS = [8, 9, 10, 11, 13, 14, 15, 16, 17];
+        const apptHour = apptDate.getHours();
+
+        if (VALID_HOURS.indexOf(apptHour) === -1) {
             return res.status(400).json({
                 message: "Appointments are only available from 8:00 AM - 11:00 AM and 1:00 PM - 5:00 PM. 12:00 PM is lunch break."
             });
         }
 
-        if(apptDate.getMinutes() !== 0){
+        if (apptDate.getMinutes() !== 0) {
             return res.status(400).json({
                 message: "Appointments must be scheduled on the hour (e.g. 8:00 AM, 9:00 AM)."
             });
         }
 
-        const dayOfWeek= apptDate.getDay();
-        if(dayOfWeek === 0 || dayOfWeek === 6){
+        const dayOfWeek = apptDate.getDay();
+        if (dayOfWeek === 0 || dayOfWeek === 6) {
             return res.status(400).json({
                 message: "Appointments are only available Monday to Friday."
             });
         }
 
-        const startOfSlot= new Date(apptDate.getTime() - 50 * 60 * 1000);
-        const endOfSlot= new Date(apptDate.getTime() + 50 * 60 * 1000);
+        if (!reason || typeof reason !== "string" || reason.trim().length < 2) {
+            return res.status(400).json({
+                message: "Please provide a valid reason for the appointment (at least 2 characters)."
+            });
+        }
 
-        const conflict= await Appointment.findOne({
+        const startOfSlot = new Date(apptDate.getTime() - 50 * 60 * 1000);
+        const endOfSlot = new Date(apptDate.getTime() + 50 * 60 * 1000);
+
+        const conflict = await Appointment.findOne({
             appointmentDate: { $gte: startOfSlot, $lte: endOfSlot },
             status: { $ne: "Cancelled" }
         });
 
-        if(conflict){
+        if (conflict) {
             return res.status(400).json({
                 message: "This time slot is already booked. Please choose another time slot."
             });
         }
 
-        const appointment= new Appointment({
+        const appointment = new Appointment({
             patientId: patientId,
             appointmentDate: appointmentDate,
-            reason: reason
+            reason: reason.trim()
         });
 
         await appointment.save();
@@ -62,92 +92,107 @@ const createAppointment= async (req, res) => {
             message: "Appointment created successfully.",
             appointment: appointment
         });
-    
-    }catch (err){
+    } catch (err) {
         res.status(500).json({
             message: "Failed to create appointment."
         });
     }
-}
+};
 
-const getAppointments= async (req, res) => {
-    try{
-        const appointments= await Appointment.find()
+const getAppointments = async (req, res) => {
+    try {
+        const appointments = await Appointment.find()
             .populate("patientId");
 
         res.status(200).json(appointments);
-    }catch (err){
+    } catch (err) {
         res.status(500).json({
             message: "Failed to retrieve appointments."
-        })
+        });
     }
-}
+};
 
-const getAppointmentById= async (req, res) =>{
-    try{
-        const appointment= await Appointment.findById(req.params.id)
+const getAppointmentById = async (req, res) => {
+    try {
+        const appointment = await Appointment.findById(req.params.id)
             .populate("patientId");
 
-        if(!appointment){
+        if (!appointment) {
             return res.status(404).json({
                 message: "Appointment not found."
             });
         }
 
         res.status(200).json(appointment);
-    
-    }catch (err){
+    } catch (err) {
         return res.status(500).json({
             message: "Failed to retrieve appointment."
         });
     }
-}
+};
 
-const updateAppointment= async (req, res) => {
-    try{
-        const { patientId, appointmentDate, reason, status }= req.body
+const updateAppointment = async (req, res) => {
+    try {
+        const { patientId, appointmentDate, reason, status } = req.body;
 
         const existing = await Appointment.findById(req.params.id);
-        if(!existing){
+        if (!existing) {
             return res.status(404).json({
                 message: "Appointment not found."
             });
         }
 
-        if(existing.status === "Cancelled" && status === "Scheduled"){
+        const validStatuses = ["Scheduled", "Completed", "Cancelled"];
+        if (status && validStatuses.indexOf(status) === -1) {
+            return res.status(400).json({
+                message: "Invalid appointment status."
+            });
+        }
+
+        if (existing.status === "Cancelled" && status === "Scheduled") {
             return res.status(400).json({
                 message: "Cancelled appointments cannot be put back to Scheduled."
             });
         }
 
-        if(appointmentDate && status !== "Cancelled"){
+        if (status === "Completed") {
+            const targetDate = appointmentDate ? new Date(appointmentDate) : existing.appointmentDate;
+            if (new Date() < targetDate) {
+                return res.status(400).json({
+                    message: "Appointments can only be marked as Completed during or after the appointment date."
+                });
+            }
+        }
+
+        if (appointmentDate && status !== "Cancelled") {
             const reqDate = new Date(appointmentDate);
             const conflict = await Appointment.findOne({
                 _id: { $ne: req.params.id },
                 appointmentDate: { $gte: new Date(reqDate.getTime() - 50 * 60 * 1000), $lte: new Date(reqDate.getTime() + 50 * 60 * 1000) },
                 status: { $ne: "Cancelled" }
             });
-            if(conflict){
+            if (conflict) {
                 return res.status(400).json({
                     message: "This time slot is already booked."
                 });
             }
         }
 
-        const appointment= await Appointment.findByIdAndUpdate(req.params.id,
-            {
-                patientId: patientId,
-                appointmentDate: appointmentDate,
-                reason: reason,
-                status: status
-            },
+        const updateData = {};
+        if (patientId) updateData.patientId = patientId;
+        if (appointmentDate) updateData.appointmentDate = appointmentDate;
+        if (reason) updateData.reason = reason.trim();
+        if (status) updateData.status = status;
+
+        const appointment = await Appointment.findByIdAndUpdate(req.params.id,
+            updateData,
             {
                 returnDocument: "after",
                 runValidators: true
             }
         );
 
-        if(!appointment){
+        if (!appointment) {
             return res.status(404).json({
                 message: "Appointment not found."
             });
@@ -157,19 +202,18 @@ const updateAppointment= async (req, res) => {
             message: "Appointment updated successfully.",
             appointment: appointment
         });
-
-    }catch (err){
+    } catch (err) {
         res.status(500).json({
             message: "Failed to update appointment."
         });
     }
 };
 
-const deleteAppointment= async (req, res) => {
-    try{
-        const appointment= await Appointment.findByIdAndDelete(req.params.id);
+const deleteAppointment = async (req, res) => {
+    try {
+        const appointment = await Appointment.findByIdAndDelete(req.params.id);
 
-        if(!appointment){
+        if (!appointment) {
             return res.status(404).json({
                 message: "Appointment not found."
             });
@@ -178,12 +222,11 @@ const deleteAppointment= async (req, res) => {
         res.status(200).json({
             message: "Appointment deleted successfully."
         });
-    
-    }catch (err){
+    } catch (err) {
         res.status(500).json({
             message: "Failed to delete appointment."
         });
     }
 };
 
-module.exports= { createAppointment, getAppointments, getAppointmentById, updateAppointment, deleteAppointment };
+module.exports = { createAppointment, getAppointments, getAppointmentById, updateAppointment, deleteAppointment };

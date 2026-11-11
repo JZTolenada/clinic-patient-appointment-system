@@ -14,6 +14,70 @@ let selectedPatientIdToDelete = null
 
 let allPatientsData = []
 
+function triggerAlert(message, title) {
+    if (typeof showAlert === "function") {
+        showAlert(message, title)
+    } else {
+        let modal = document.getElementById("alertModal")
+        let msg = document.getElementById("alertMessage")
+        let titleEl = document.getElementById("alertTitle")
+        if (modal && msg) {
+            msg.textContent = message
+            if (titleEl) {
+                titleEl.textContent = title || "Notice"
+            }
+            modal.classList.remove("hidden")
+        }
+    }
+}
+
+function validatePatientForm(first, middle, last, phone, age, gender) {
+    let nameRegex = /^[A-Za-z\s\-'.]+$/
+    let phoneDigits = phone.replace(/[\s\-]/g, "")
+
+    if (!first) {
+        return "First name is required."
+    }
+    if (first.length < 2 || !nameRegex.test(first)) {
+        return "First name must only contain letters and be at least 2 characters long."
+    }
+
+    if (!middle) {
+        return "Middle name is required."
+    }
+    if (!nameRegex.test(middle)) {
+        return "Middle name must only contain letters."
+    }
+
+    if (!last) {
+        return "Last name is required."
+    }
+    if (last.length < 2 || !nameRegex.test(last)) {
+        return "Last name must only contain letters and be at least 2 characters long."
+    }
+
+    if (!phone) {
+        return "Contact number is required."
+    }
+    if (!/^09\d{9}$/.test(phoneDigits)) {
+        return "Contact number must be an 11-digit mobile number starting with 09 (e.g., 09123456789)."
+    }
+
+    if (!age && age !== 0) {
+        return "Age is required."
+    }
+    let ageNum = Number(age)
+    if (isNaN(ageNum) || !Number.isInteger(ageNum) || ageNum < 0 || ageNum > 125) {
+        return "Age must be a valid whole number between 0 and 125."
+    }
+
+    if (!gender || (gender !== "Male" && gender !== "Female")) {
+        return "Please select a valid gender (Male or Female)."
+    }
+
+    return null
+}
+
 function loadPatients() {
     fetch("/patients")
         .then(function (response) {
@@ -110,9 +174,15 @@ confirmDeletePatientBtn.addEventListener("click", function () {
         method: "DELETE"
     })
         .then(function (response) {
-            return response.json()
+            return response.json().then(function (data) {
+                return { ok: response.ok, data: data }
+            })
         })
-        .then(function (data) {
+        .then(function (result) {
+            if (!result.ok) {
+                triggerAlert(result.data.message || "Failed to delete patient.", "Delete Error")
+                return
+            }
             if (patientSuccessText) patientSuccessText.textContent = "Deleted Successfully!"
             patientSuccessModal.classList.remove("hidden")
             loadPatients()
@@ -123,7 +193,7 @@ confirmDeletePatientBtn.addEventListener("click", function () {
             }, 2000)
         })
         .catch(function () {
-            showAlert("Failed to delete patient.")
+            triggerAlert("A network error occurred while deleting the patient.", "Delete Error")
         })
 })
 
@@ -161,8 +231,9 @@ submitPatientBtn.addEventListener("click", function () {
     let age = document.getElementById("pAge").value.trim()
     let gender = document.getElementById("pGender").value
 
-    if (!first || !middle || !last || !phone || !age || !gender) {
-        showAlert("Please fill in all required fields.")
+    let error = validatePatientForm(first, middle, last, phone, age, gender)
+    if (error) {
+        triggerAlert(error, "Invalid Patient Data")
         return
     }
 
@@ -175,13 +246,19 @@ submitPatientBtn.addEventListener("click", function () {
             lastName: last,
             age: parseInt(age),
             sex: gender,
-            phone: phone
+            phone: phone.replace(/[\s\-]/g, "")
         })
     })
         .then(function (response) {
-            return response.json()
+            return response.json().then(function (data) {
+                return { ok: response.ok, data: data }
+            })
         })
-        .then(function (data) {
+        .then(function (result) {
+            if (!result.ok) {
+                triggerAlert(result.data.message || "Failed to register patient.", "Registration Error")
+                return
+            }
             patientModal.classList.add("hidden")
             if (patientSuccessText) patientSuccessText.textContent = "Added Successfully!"
             patientSuccessModal.classList.remove("hidden")
@@ -189,6 +266,9 @@ submitPatientBtn.addEventListener("click", function () {
             setTimeout(function () {
                 patientSuccessModal.classList.add("hidden")
             }, 2000)
+        })
+        .catch(function () {
+            triggerAlert("A network error occurred while registering the patient.", "Network Error")
         })
 })
 
@@ -201,8 +281,9 @@ submitEditPatientBtn.addEventListener("click", function () {
     let age = document.getElementById("editAge").value.trim()
     let gender = document.getElementById("editGender").value
 
-    if (!first || !middle || !last || !phone || !age || !gender) {
-        showAlert("Please fill in all required fields.")
+    let error = validatePatientForm(first, middle, last, phone, age, gender)
+    if (error) {
+        triggerAlert(error, "Invalid Patient Data")
         return
     }
 
@@ -215,13 +296,19 @@ submitEditPatientBtn.addEventListener("click", function () {
             lastName: last,
             age: parseInt(age),
             sex: gender,
-            phone: phone
+            phone: phone.replace(/[\s\-]/g, "")
         })
     })
         .then(function (response) {
-            return response.json()
+            return response.json().then(function (data) {
+                return { ok: response.ok, data: data }
+            })
         })
-        .then(function (data) {
+        .then(function (result) {
+            if (!result.ok) {
+                triggerAlert(result.data.message || "Failed to update patient.", "Update Error")
+                return
+            }
             editPatientModal.classList.add("hidden")
             if (patientSuccessText) patientSuccessText.textContent = "Updated Successfully!"
             patientSuccessModal.classList.remove("hidden")
@@ -230,6 +317,9 @@ submitEditPatientBtn.addEventListener("click", function () {
             setTimeout(function () {
                 patientSuccessModal.classList.add("hidden")
             }, 2000)
+        })
+        .catch(function () {
+            triggerAlert("A network error occurred while updating the patient.", "Network Error")
         })
 })
 

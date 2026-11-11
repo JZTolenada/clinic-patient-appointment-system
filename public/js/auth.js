@@ -4,14 +4,19 @@ let loginBtn = document.getElementById("loginBtn")
 let loginError = document.getElementById("loginError")
 let signOutBtn = document.getElementById("signOutBtn")
 
-function showAlert(message) {
+function showAlert(message, title) {
     let modal = document.getElementById("alertModal")
     let msg = document.getElementById("alertMessage")
+    let titleEl = document.getElementById("alertTitle")
     if (modal && msg) {
         msg.textContent = message
+        if (titleEl) {
+            titleEl.textContent = title || "Notice"
+        }
         modal.classList.remove("hidden")
     }
 }
+window.showAlert = showAlert
 
 let alertModal = document.getElementById("alertModal")
 let closeAlertBtn = document.getElementById("closeAlertBtn")
@@ -46,8 +51,23 @@ function checkAuth() {
 }
 
 loginBtn.addEventListener("click", function () {
-    let username = document.getElementById("loginUsername").value
-    let password = document.getElementById("loginPassword").value
+    let username = document.getElementById("loginUsername").value.trim()
+    let password = document.getElementById("loginPassword").value.trim()
+
+    if (!username && !password) {
+        showAlert("Please enter your username and password.", "Login Required")
+        return
+    }
+
+    if (!username) {
+        showAlert("Please enter your username.", "Login Required")
+        return
+    }
+
+    if (!password) {
+        showAlert("Please enter your password.", "Login Required")
+        return
+    }
 
     if (username === "admin" && password === "12345678") {
         localStorage.setItem("loggedIn", "true")
@@ -55,6 +75,7 @@ loginBtn.addEventListener("click", function () {
         checkAuth()
     } else {
         loginError.classList.remove("hidden")
+        showAlert("Invalid username or password. Please try again.", "Authentication Failed")
     }
 })
 
